@@ -1,0 +1,73 @@
+{
+  "name": "bangla-text-kit",
+  "version": "0.1.0",
+  "description": "Bangla (Bengali) text utilities: Unicode normalization, digits, search folding, graphemes, tokenizer, sentence splitter, stopwords, stemmer, phonetic typing and romanization. Zero runtime dependencies.",
+  "keywords": [
+    "bangla",
+    "bengali",
+    "unicode",
+    "normalization",
+    "nlp",
+    "tokenizer",
+    "transliteration",
+    "avro",
+    "phonetic",
+    "romanization",
+    "search",
+    "grapheme"
+  ],
+  "author": "Saizul Amin (https://github.com/saizul)",
+  "license": "MIT",
+  "homepage": "https://github.com/saizul/bangla-text-kit#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saizul/bangla-text-kit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/saizul/bangla-text-kit/issues"
+  },
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/esm",
+    "dist/cjs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-package.mjs",
+    "build:test": "tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome lint src test scripts examples && npm run typecheck",
+    "format": "biome format --write src test scripts examples",
+    "test": "npm run build && npm run build:test && node --test dist/test/",
+    "test:only": "node --test dist/test/",
+    "prepublishOnly": "npm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.7",
+    "@types/node": "^18.19.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,400 @@
+# bangla-text-kit
+
+[![CI](https://github.com/saizul/bangla-text-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/saizul/bangla-text-kit/actions/workflows/ci.yml)
+![Node 18+](https://img.shields.io/badge/node-18%2B-blue)
+![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+
+Bangla (Bengali) text utilities for JavaScript and TypeScript. It covers
+Unicode normalization that understands Bangla, digit conversion, fuzzy search
+folding, grapheme-safe truncation, a tokenizer and sentence splitter,
+stopwords and a stemmer, Avro-style phonetic typing, romanization and script
+detection. It has **zero runtime dependencies** and ships ESM, CommonJS and
+type declarations.
+
+```js
+import { normalize, fold, truncate, phonetic, romanize, splitSentences } from 'bangla-text-kit';
+
+normalize('দু:খ');                       // 'দুঃখ'   (ASCII colon -> visarga)
+fold('শিক্ষক') === fold('সিক্ষক');       // true     (শ/ষ/স folded for search)
+truncate('স্বাধীনতা দিবস', 4);            // 'স্বাধীন…' (never splits স্বা)
+phonetic('ami banglay gan gai');         // 'আমি বাংলায় গান গাই'
+romanize('আমার সোনার বাংলা');            // 'amar sonar bangla'
+splitSentences('ড. করিম এলেন। বসুন!');    // ['ড. করিম এলেন।', 'বসুন!']
+```
+
+## Why
+
+Bangla text from real users is messy in ways that NFC doesn't fix. Two strings
+can look identical on screen and still compare unequal:
+
+- **য় ড় ঢ় come in two forms.** U+09DF is one code point, and U+09AF U+09BC
+  is YA + NUKTA. NFC always picks the decomposed one, because these letters
+  are composition exclusions. Many databases hold a mix of both.
+- **Khanda ta has a legacy form.** Text from before Unicode 4.1 writes ৎ as
+  TA + VIRAMA + ZWJ.
+- **Invisible joiners.** ZWJ and ZWNJ get pasted in from word processors and
+  break search, except in the two places where they matter.
+- **Visual-order typing.** Old typing habits put ে before the consonant, or
+  type অ + া for আ, or place candrabindu before the vowel sign.
+- **A colon for visarga.** People type `দু:খ` for `দুঃখ`.
+
+On top of that, `string.length` and `.slice()` count UTF-16 code units, so
+they cut `ক্ষ` and `কি` in half. And people spell শ/ষ/স, ি/ী, ু/ূ and ন/ণ
+interchangeably, which makes exact search useless.
+
+## Features
+
+- **Normalization**: NFC plus the Bangla fixes listed above. Every fix is
+  optional, and `findIssues()` reports which problems a text has.
+- **Digits**: ASCII to Bangla and back, `formatNumber()` with lakh/crore
+  grouping (১২,৩৪,৫৬৭), and `parseNumber()`.
+- **Search folding**: ি/ী, ু/ূ, শ/ষ/স and ন/ণ by default, with optional
+  য/জ, ড়/র, candrabindu and ঋ/রি folds. `findAll()` returns positions in the
+  original text for highlighting.
+- **Graphemes**: `Intl.Segmenter`, or a builtin segmenter with conjunct rules
+  (GB9c) that behaves the same on every Node version. Includes length, slice,
+  truncate and reverse.
+- **Tokenizer**: words, numbers, punctuation and symbols with offsets. Joiners,
+  conjuncts, `১০টা`, `১২,৫০০.৭৫` and `সাদা-কালো` stay whole.
+- **Sentence splitter**: splits on দাঁড়ি (।), double danda (॥), `?`, `!` and
+  `.`. It knows Bangla and English abbreviations (ড., মো., Dr.), initials
+  (এ. কে. এম.) and decimals.
+- **Stopwords and stemmer**: 360+ stopwords, and a light suffix-stripping
+  stemmer that maps ছেলে, ছেলের, ছেলেরা and ছেলেদের to one key.
+- **Transliteration**: Avro-style phonetic input to Bangla, and Bangla to
+  Latin in a simple ASCII scheme or an ISO 15919 style scheme with
+  diacritics. Includes `slugify()`.
+- **Script detection**: the Bangla share of the letters, `isBangla()` and
+  `dominantScript()`.
+
+## Install
+
+```bash
+npm install bangla-text-kit
+```
+
+Requires Node 18 or newer. It also works in browsers and edge runtimes that
+support ES2022 and `\p{...}` regular expressions. Only the `intl` grapheme
+engine needs `Intl.Segmenter`, and `auto` falls back to the builtin one.
+
+```js
+// ESM
+import { normalize } from 'bangla-text-kit';
+// CommonJS
+const { normalize } = require('bangla-text-kit');
+```
+
+## Usage
+
+### Normalization
+
+```js
+import { normalize, findIssues } from 'bangla-text-kit';
+
+normalize(t);                  // য় ড় ঢ় as U+09DF/U+09DC/U+09DD -> YA/DDA/DDHA + NUKTA (NFC)
+normalize('হঠাত' + '\u09CD\u200D'); // legacy TA + VIRAMA + ZWJ -> 'হঠাৎ'
+normalize('েকা');              // ে typed first -> 'কো'
+normalize('চঁাদ');             // candrabindu before the sign -> 'চাঁদ'
+normalize('অামি');             // অ + া -> 'আমি'
+normalize('দু:খ');             // 'দুঃখ'
+normalize('নাম: করিম');        // unchanged, a colon before a space is a label
+
+normalize(text, { nukta: 'composed' });   // emit U+09DC/U+09DD/U+09DF instead
+findIssues('েকা দু:খ');                   // ['vowel-sign-order', 'colon-for-visarga']
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `nukta` | `'decomposed'` | `'composed'` outputs য় ড় ঢ় as single code points (the result is then not NFC) |
+| `khandaTa` | `true` | TA + VIRAMA + ZWJ (and TA + ZWJ + VIRAMA) to ৎ (U+09CE) |
+| `joiners` | `'clean'` | `'clean'` removes ZWJ/ZWNJ next to Bangla letters unless they touch a virama (ক্‌ষ, র‍্য keep theirs); `'remove'` removes all of them; `'keep'` keeps them all. Emoji ZWJ sequences and other scripts are never touched |
+| `vowelSigns` | `true` | moves pre-base signs typed before their consonant (including past conjuncts), composes ে + া and ে + ৗ, moves a nukta typed after a sign, moves candrabindu after the sign, and turns অ + া / ো / ৌ into আ / ও / ঔ |
+| `duplicateMarks` | `true` | the same sign typed twice (কাা) becomes one |
+| `colonToVisarga` | `true` | an ASCII or fullwidth colon between Bangla letters becomes ঃ |
+| `visargaToColon` | `false` | ঃ followed by a digit or line end becomes `:` (সময়ঃ ১০টা) |
+| `pipeToDanda` | `false` | `|` after a Bangla word at the end of a sentence becomes । |
+| `doubleDanda` | `false` | `।।` becomes ॥ |
+
+`normalize` is idempotent. The individual fixers (`fixKhandaTa`,
+`cleanJoiners`, `fixVowelSigns`, `removeDuplicateMarks`, `colonToVisarga`,
+`composeNukta`, `decomposeNukta`) are exported too.
+
+### Digits and numbers
+
+```js
+toBanglaDigits(2026);                    // '২০২৬'
+toBanglaDigits('Tel 01712');             // 'Tel ০১৭১২'
+toLatinDigits('৳ ১,২৩৪.৫০');             // '৳ 1,234.50'
+formatNumber(1234567.5);                 // '১২,৩৪,৫৬৭.৫'
+formatNumber(1234567, { digits: 'latin', grouping: 'international' }); // '1,234,567'
+formatNumber(1500, { fractionDigits: 2 });                              // '১,৫০০.০০'
+parseNumber('১২,৩৪,৫৬৭.৫০');             // 1234567.5
+```
+
+Turning numbers into Bangla words (১২৩ to একশো তেইশ) is out of scope for
+this package.
+
+### Search folding
+
+```js
+import { fold, includesFolded, createMatcher, findAll } from 'bangla-text-kit';
+
+fold('শীক্ষক');                          // 'সিক্সক' (a search key, not for display)
+includesFolded('আমাদের শিক্ষক', 'সিক্ষক'); // true
+names.filter(createMatcher('পূর্বাশা'));   // also matches 'পুর্বাসা'
+
+findAll('সে শিক্ষক, তিনি সিক্ষক', 'শিক্ষক');
+// [{ start: 3, end: 9, text: 'শিক্ষক' }, { start: 16, end: 22, text: 'সিক্ষক' }]
+```
+
+| Option | Default | Folds |
+|---|---|---|
+| `ii` | `true` | ী to ি, ঈ to ই |
+| `uu` | `true` | ূ to ু, ঊ to উ |
+| `sibilants` | `true` | শ and ষ to স |
+| `nasals` | `true` | ণ to ন |
+| `khandaTa` | `true` | ৎ to ত |
+| `ja` | `false` | য to জ (য় is left alone) |
+| `ra` | `false` | ড় and ঢ় to র |
+| `candrabindu` | `false` | removes ঁ |
+| `vocalicR` | `false` | ঋ to রি, ৃ to ্রি |
+| `joiners`, `digits`, `lowercase`, `whitespace` | `true` | remove ZWJ/ZWNJ, Bangla digits to ASCII, lower-case Latin, collapse spaces |
+
+`findAll()` folds per grapheme cluster and maps every folded character back to
+its source cluster. A match that ends inside a cluster is widened to cover the
+whole cluster.
+
+### Graphemes and truncation
+
+```js
+'বাংলাদেশ'.length;                        // 8
+graphemeLength('বাংলাদেশ');               // 4: বাং লা দে শ
+graphemes('ক্ষমা', { engine: 'builtin' }); // ['ক্ষ', 'মা']
+sliceGraphemes('বাংলাদেশ', 2);             // 'দেশ'
+truncate('আমার সোনার বাংলা', 8, { wordBoundary: true }); // 'আমার…'
+```
+
+The `engine` option picks the segmenter:
+
+- `auto` (default): `Intl.Segmenter` when the runtime has it, the builtin
+  segmenter otherwise.
+- `intl`: `Intl.Segmenter`. Its rules depend on the ICU in your Node. Since
+  Unicode 15.1 (Node 22+), conjuncts such as ক্ষ are a single cluster. Node 18
+  and 20 split them after the virama.
+- `builtin`: this package's segmenter. It applies GB9c, so ক্ষ, স্ত্রী and
+  র‍্যা are one cluster everywhere. ZWNJ breaks a conjunct (ক্‌ষ is two
+  clusters). It also handles CRLF, emoji ZWJ sequences, skin tones and flags.
+  Use it when results must be identical across environments, for example
+  when a database column limit is enforced on both client and server.
+
+`truncate(text, max, { ellipsis = '…', wordBoundary = false })` counts the
+ellipsis toward `max`.
+
+### Tokenizer
+
+```js
+tokenize('দাম ১২,৫০০.৭৫ টাকা।');
+// [ { text: 'দাম', type: 'word', start: 0, end: 3 },
+//   { text: ' ', type: 'whitespace', ... },
+//   { text: '১২,৫০০.৭৫', type: 'number', ... }, ...
+//   { text: '।', type: 'punctuation', ... } ]
+
+words('১০টা বই, সাদা-কালো ছবি');        // ['১০টা', 'বই', 'সাদা-কালো', 'ছবি']
+words(text, { numbers: false, lowercase: true, normalize: true });
+wordCount('আমার সোনার বাংলা');           // 3
+```
+
+Token types are `word`, `number`, `punctuation`, `whitespace` and `symbol`.
+Offsets are UTF-16 indexes into the input, or into the normalized text when
+`normalize` is set.
+
+### Sentences
+
+```js
+splitSentences('আমি যাব।তুমি থাকো? দাম ৩.৫ টাকা। ড. ইউনূস এলেন।');
+// ['আমি যাব।', 'তুমি থাকো?', 'দাম ৩.৫ টাকা।', 'ড. ইউনূস এলেন।']
+
+sentenceSpans(text);   // [{ text, start, end }, ...]
+splitSentences(text, { extraAbbreviations: ['প্রকৌ.'], splitOnNewline: true });
+```
+
+The splitter has these rules:
+
+- দাঁড়ি always ends a sentence, even without a following space.
+- `?` and `!` end a sentence before whitespace or a Bangla letter.
+- `.` ends a sentence unless it is a decimal point, follows a known
+  abbreviation or a chain of initials (এ. কে. এম., A. K.), or is followed
+  directly by a letter (example.com).
+- Closing quotes and brackets stay with their sentence.
+- Blank lines always split.
+
+### Stopwords and stemming
+
+```js
+isStopword('এবং');                                   // true
+removeStopwords(words('আমি এবং তুমি বাংলাদেশে থাকি')); // ['বাংলাদেশে', 'থাকি']
+stem('ছেলেদের');   // 'ছেল'   (ছেলে, ছেলের, ছেলেরা give the same)
+stem('বইগুলো');    // 'বই'
+stem('করেছিলাম');  // 'কর'
+stem('করেছিলাম', { verbs: false }); // unchanged
+```
+
+The stemmer is rule-based and doesn't use a dictionary. Its stems are search
+keys, not dictionary words.
+
+### Phonetic typing (Avro-style)
+
+```js
+phonetic('amar sOnar bangla');  // 'আমার সোনার বাংলা'
+phonetic('shikkhok');           // 'শিক্ষক'
+phonetic('biggan');             // 'বিজ্ঞান'
+phonetic('du:kh');              // 'দুঃখ'
+phonetic('ca^d');               // 'চাঁদ'
+phonetic('hoThat``');           // 'হঠাৎ'
+phonetic('20 Taka $');          // '২০ টাকা ৳'
+```
+
+The conventions follow the Avro Phonetic layout:
+
+- **Case.** `o` is the inherent vowel and `O` is ো. Case also separates these
+  pairs: `t`/`T`, `d`/`D`, `n`/`N`, `s`/`S`/`Sh`, `r`/`R`, `i`/`I` and
+  `u`/`U`. Other capitals read as lower case.
+- **Conjuncts.** Two consonants with no vowel between them form a conjunct
+  when the pair is a common one (`nt` ন্ত, `kSh` ক্ষ, `gg` জ্ঞ). `r` before a
+  consonant is reph. `r`, `y` and `w` after a consonant are ra-, ya- and
+  ba-phala.
+- **Keeping consonants apart.** Type `o` between them (`dorokar` দরকার), or
+  use the separator `` ` ``.
+- **`ng`.** `ng` is ং, except before a vowel or k/g, where it is ঙ (`rongin`
+  রঙিন).
+- **Other keys.** `:` ঃ, `^` ঁ, ``t`` `` ৎ, `,,` explicit hasanta, `.` ।, `..`
+  a full stop, `$` ৳. Digits become Bangla digits.
+
+This is a deterministic rule engine. It doesn't suggest dictionary spellings
+the way the Avro keyboard's suggestion list does.
+
+### Romanization
+
+```js
+romanize('আমার সোনার বাংলা');            // 'amar sonar bangla'
+romanize('সত্য');                         // 'sotyo'
+romanize('বাংলা', { scheme: 'iso' });     // 'bāṁlā'
+romanize('ক্ষমা', { scheme: 'iso' });     // 'kṣamā'
+slugify('ঢাকা শহরের খবর');                // 'dhaka-shohorer-khobor'
+```
+
+- **`simple`** writes the inherent vowel as `o` and drops it at the end of a
+  word, except after a conjunct. It is meant for slugs, usernames and search.
+- **`iso`** follows ISO 15919 conventions. It always writes the inherent
+  vowel `a` and uses diacritics (ṭ ḍ ṇ ś ṣ ṁ ḥ ẏ ṛ).
+
+### Script detection
+
+```js
+banglaRatio('আমি Facebook ব্যবহার করি');  // 0.62
+isBangla('I use ফেসবুক every day');       // false
+isBangla('I use ফেসবুক every day', { threshold: 0.2 }); // true
+scriptStats('কি? ok');  // { bangla: 2, latin: 2, other: 0, banglaDigits: 0, total: 4, banglaRatio: 0.5 }
+dominantScript('বাংলা text');             // 'bangla'
+```
+
+Detection counts letters and combining marks. Whitespace, punctuation, ZWJ and
+ZWNJ are ignored, and digits only count with `countDigits: true`.
+
+## API reference
+
+| Module | Exports |
+|---|---|
+| chars | `CP`, `CH`, `isConsonant`, `isFullConsonant`, `isIndependentVowel`, `isVowelSign`, `isPreBaseVowelSign`, `isVariousSign`, `isCombining`, `isBanglaDigit`, `isBanglaLetterOrMark`, `isAssignedBengali`, `inBengaliBlock`, `cps`, `fromCps`, `describeCodePoints` |
+| normalize | `normalize(text, options?)`, `isNormalized`, `findIssues`, `fixKhandaTa`, `cleanJoiners(text, mode?)`, `fixVowelSigns`, `removeDuplicateMarks`, `colonToVisarga`, `visargaToColon`, `pipeToDanda`, `doubleDanda`, `composeNukta`, `decomposeNukta`, `DEFAULT_NORMALIZE_OPTIONS` |
+| digits | `toBanglaDigits(value)`, `toLatinDigits(text)`, `hasBanglaDigits`, `formatNumber(value, options?)`, `parseNumber(text)` |
+| fold | `fold(text, options?)`, `foldedEquals(a, b, options?)`, `includesFolded`, `createMatcher(query, options?)`, `findAll(text, query, options?)`, `foldWithOffsets`, `DEFAULT_FOLD_OPTIONS` |
+| grapheme | `graphemes(text, options?)`, `graphemeLength`, `sliceGraphemes(text, start, end?, options?)`, `truncate(text, max, options?)`, `reverseGraphemes`, `segmentGraphemesBuiltin(text, conjuncts?)`, `hasIntlSegmenter()` |
+| tokenize | `tokenize(text, options?)`, `words(text, options?)`, `wordCount(text)` |
+| sentence | `splitSentences(text, options?)`, `sentenceSpans(text, options?)`, `DEFAULT_ABBREVIATIONS` |
+| stopwords | `STOPWORDS`, `isStopword(word, extra?)`, `removeStopwords(words, extra?)` |
+| stem | `stem(word, options?)`, `stemAll(words, options?)` |
+| phonetic | `phonetic(input, options?)` |
+| romanize | `romanize(text, options?)`, `slugify(text, separator?)` |
+| detect | `scriptStats(text, options?)`, `banglaRatio`, `isBangla(text, options?)`, `dominantScript`, `containsBangla` |
+
+Every function is pure and synchronous, and every option is optional. The
+TypeScript declarations document each option.
+
+## Configuration
+
+There is no global state or configuration file. Behaviour is controlled per
+call through the option objects described above. To use one setup throughout
+an app, wrap the functions once:
+
+```js
+const searchKey = (s) => fold(s, { ja: true, ra: true, candrabindu: true });
+const clean = (s) => normalize(s, { nukta: 'composed', pipeToDanda: true });
+```
+
+## Examples
+
+Build first (`npm run build`), then run:
+
+- [`examples/basic.mjs`](examples/basic.mjs): a tour of every module
+- [`examples/search.mjs`](examples/search.mjs): fuzzy search with highlighted matches (`node examples/search.mjs সিক্ষক`)
+- [`examples/phonetic-stdin.mjs`](examples/phonetic-stdin.mjs): phonetic text from standard input to Bangla
+- [`examples/clean-csv-column.mjs`](examples/clean-csv-column.mjs): add a normalized search key column to a CSV
+- [`examples/commonjs.cjs`](examples/commonjs.cjs): `require()` usage
+
+## Testing
+
+```bash
+npm ci
+npm test        # builds ESM and CJS, compiles the tests, runs node:test
+npm run lint    # biome lint + tsc --noEmit
+```
+
+The suite has 180 tests covering tricky Unicode cases. Code points are
+checked against the Unicode Bengali chart (U+0980..U+09FF): composition
+exclusions, both nukta forms, legacy khanda ta, joiners next to and away from
+a virama, emoji ZWJ sequences and Persian ZWNJ that must survive, vowel signs
+typed before conjuncts, idempotence, both grapheme engines, and the CommonJS
+build. Ambiguous characters such as the nukta, the precomposed nukta letters,
+ZWJ and ZWNJ are written as escapes in the tests, so what is being tested is
+visible.
+
+## Limitations
+
+- **The stemmer is light.** It strips suffixes without a dictionary, so
+  stems are not always words (ছেলে becomes ছেল) and some words ending in a
+  suffix-like syllable are over-stripped (বাজার becomes বাজা). This is fine
+  for search keys but not for display.
+- **Sentence splitting is rule-based.** Unknown abbreviations ending in `.`
+  split a sentence. Add them with `extraAbbreviations`.
+- **Phonetic input follows Avro conventions, not every Avro rule.** Rare
+  conjuncts outside the built-in list need `,,` (hasanta), and nothing is
+  guessed from a dictionary.
+- **Romanization is not reversible** in the `simple` scheme, and it
+  approximates pronunciation (silent ব-ফলা is still written `w`).
+- **`intl` grapheme results vary with the ICU version.** Use `builtin` when
+  you need the same result on every runtime.
+- **Normalization targets modern Bangla.** Assamese (ৰ ৱ) and Sanskrit-only
+  letters pass through, but the Bangla-specific fixes are not tuned for them.
+- Number to Bangla words is deliberately out of scope.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately as
+described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Saizul Amin
+
+## Install from GitHub Packages
+
+Releases are published as `@saizul/bangla-text-kit` on GitHub Packages:
+
+```bash
+echo "@saizul:registry=https://npm.pkg.github.com" >> .npmrc
+npm install @saizul/bangla-text-kit
+```
+
+GitHub Packages needs a personal access token with `read:packages` in your npm config to install.
