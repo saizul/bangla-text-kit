@@ -61,8 +61,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome lint src test scripts examples && npm run typecheck",
     "format": "biome format --write src test scripts examples",
-    "test": "npm run build && npm run build:test && node --test dist/test/",
-    "test:only": "node --test dist/test/",
+    "test": "npm run build && npm run build:test && node --test dist/test/*.test.js",
+    "test:only": "node --test dist/test/*.test.js",
     "prepublishOnly": "npm test"
   },
   "devDependencies": {
