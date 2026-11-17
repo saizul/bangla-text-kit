@@ -14,5 +14,6 @@ export * from './stem.js';
 export * from './phonetic.js';
 export * from './romanize.js';
 export * from './detect.js';
+export * from './calendar.js';
 
 export const VERSION = '0.1.0';
