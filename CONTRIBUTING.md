@@ -69,6 +69,12 @@ src/
   phonetic.ts    Avro-style phonetic input
   romanize.ts    Bangla to Latin, slugify
   detect.ts      script ratio
+  calendar.ts    Bangla calendar (বঙ্গাব্দ), Bangla date names and formatting
 test/            node:test suites
 examples/        runnable scripts
 ```
+
+## Code of conduct
+
+Everyone taking part in this project is expected to follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Be respectful and constructive.

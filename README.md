@@ -8,9 +8,9 @@
 Bangla (Bengali) text utilities for JavaScript and TypeScript. It covers
 Unicode normalization that understands Bangla, digit conversion, fuzzy search
 folding, grapheme-safe truncation, a tokenizer and sentence splitter,
-stopwords and a stemmer, Avro-style phonetic typing, romanization and script
-detection. It has **zero runtime dependencies** and ships ESM, CommonJS and
-type declarations.
+stopwords and a stemmer, Avro-style phonetic typing, romanization, script
+detection and the Bangla calendar (বঙ্গাব্দ). It has **zero runtime
+dependencies** and ships ESM, CommonJS and type declarations.
 
 ```js
 import { normalize, fold, truncate, phonetic, romanize, splitSentences } from 'bangla-text-kit';
@@ -67,6 +67,10 @@ interchangeably, which makes exact search useless.
   diacritics. Includes `slugify()`.
 - **Script detection**: the Bangla share of the letters, `isBangla()` and
   `dominantScript()`.
+- **Bangla calendar**: Gregorian to বঙ্গাব্দ and back using the revised
+  Bangladesh calendar, with month, weekday and season (ঋতু) names,
+  `formatBanglaDate()` patterns, Gregorian dates with Bangla month names, and
+  `parseBanglaDate()` for written dates such as `১লা বৈশাখ ১৪৩৩`.
 
 ## Install
 
@@ -302,6 +306,43 @@ dominantScript('বাংলা text');             // 'bangla'
 Detection counts letters and combining marks. Whitespace, punctuation, ZWJ and
 ZWNJ are ignored, and digits only count with `countDigits: true`.
 
+### Bangla calendar (বঙ্গাব্দ)
+
+```js
+toBanglaDate('2026-04-14');
+// { year: 1433, month: 1, day: 1, monthName: 'বৈশাখ', weekday: 2, weekdayName: 'মঙ্গলবার',
+//   season: 0, seasonName: 'গ্রীষ্ম', dayOfYear: 1 }
+fromBanglaDate({ year: 1432, month: 11, day: 8 });  // { year: 2026, month: 2, day: 21 }
+
+formatBanglaDate('2026-04-14');                                       // '১ বৈশাখ ১৪৩৩'
+formatBanglaDate('2026-04-14', { pattern: 'EEEE, d MMMM y বঙ্গাব্দ' }); // 'মঙ্গলবার, ১ বৈশাখ ১৪৩৩ বঙ্গাব্দ'
+formatBanglaDate('2026-12-16', { calendar: 'gregorian' });            // '১৬ ডিসেম্বর ২০২৬'
+formatBanglaDate(new Date(), { timeZone: 'Asia/Dhaka', digits: 'latin', pattern: 'dd/MM/y' });
+
+parseBanglaDate('১লা বৈশাখ, ১৪৩৩ বঙ্গাব্দ');  // { year: 1433, month: 1, day: 1 }
+parseBanglaDate('৩০ ফাল্গুন ১৪৩১');          // null (ফাল্গুন 1431 has 29 days)
+isBanglaLeapYear(1430);                       // true: ফাল্গুন 1430 has 30 days
+banglaMonthLength(1433, 1);                   // 31
+```
+
+The conversion follows the calendar used officially in Bangladesh since the
+2019 revision: the year starts on 14 April, বৈশাখ to আশ্বিন have 31 days,
+কার্তিক to মাঘ and চৈত্র have 30, and ফাল্গুন has 29 days, or 30 when the
+February it overlaps is in a Gregorian leap year. So 21 February is always
+৮ ফাল্গুন, 26 March ১২ চৈত্র and 16 December ১ পৌষ.
+
+Dates can be given as a `Date`, an ISO `YYYY-MM-DD` string (Bangla digits are
+fine) or a `{ year, month, day }` object. A `Date` is read in the runtime's
+local time zone unless you pass `timeZone` (`'UTC'` or an IANA name such as
+`'Asia/Dhaka'`), which matters on servers that run in UTC: 20:00 UTC on 13
+April is already ১ বৈশাখ in Dhaka.
+
+Pattern tokens: `d`/`dd` day, `M`/`MM` month number, `MMMM` month name, `y`
+year (`yyyy` pads), `EEEE` weekday, `r` season. Bangla text is copied as is;
+put ASCII text in single quotes. `parseBanglaDate()` accepts day suffixes
+(১লা, ২৫শে), a trailing বঙ্গাব্দ or সন, and common spelling variants of the
+month names (শ্রাবন, অঘ্রাণ, ফাগুন, both nukta forms).
+
 ## API reference
 
 | Module | Exports |
@@ -318,6 +359,7 @@ ZWNJ are ignored, and digits only count with `countDigits: true`.
 | phonetic | `phonetic(input, options?)` |
 | romanize | `romanize(text, options?)`, `slugify(text, separator?)` |
 | detect | `scriptStats(text, options?)`, `banglaRatio`, `isBangla(text, options?)`, `dominantScript`, `containsBangla` |
+| calendar | `toBanglaDate(date, options?)`, `fromBanglaDate(date)`, `formatBanglaDate(date, options?)`, `parseBanglaDate(text)`, `isBanglaLeapYear`, `banglaMonthLength`, `toPlainDate`, `BANGLA_MONTHS`, `GREGORIAN_MONTHS_BN`, `BANGLA_WEEKDAYS`, `BANGLA_SEASONS` |
 
 Every function is pure and synchronous, and every option is optional. The
 TypeScript declarations document each option.
@@ -341,6 +383,7 @@ Build first (`npm run build`), then run:
 - [`examples/search.mjs`](examples/search.mjs): fuzzy search with highlighted matches (`node examples/search.mjs সিক্ষক`)
 - [`examples/phonetic-stdin.mjs`](examples/phonetic-stdin.mjs): phonetic text from standard input to Bangla
 - [`examples/clean-csv-column.mjs`](examples/clean-csv-column.mjs): add a normalized search key column to a CSV
+- [`examples/calendar.mjs`](examples/calendar.mjs): today's date in বঙ্গাব্দ (`node examples/calendar.mjs 2026-04-14`)
 - [`examples/commonjs.cjs`](examples/commonjs.cjs): `require()` usage
 
 ## Testing
@@ -351,14 +394,14 @@ npm test        # builds ESM and CJS, compiles the tests, runs node:test
 npm run lint    # biome lint + tsc --noEmit
 ```
 
-The suite has 180 tests covering tricky Unicode cases. Code points are
+The suite has 200 tests covering tricky Unicode cases. Code points are
 checked against the Unicode Bengali chart (U+0980..U+09FF): composition
 exclusions, both nukta forms, legacy khanda ta, joiners next to and away from
 a virama, emoji ZWJ sequences and Persian ZWNJ that must survive, vowel signs
 typed before conjuncts, idempotence, both grapheme engines, and the CommonJS
-build. Ambiguous characters such as the nukta, the precomposed nukta letters,
-ZWJ and ZWNJ are written as escapes in the tests, so what is being tested is
-visible.
+build, plus a day-by-day round trip of the calendar over eleven years.
+Ambiguous characters such as the nukta, the precomposed nukta letters, ZWJ and
+ZWNJ are written as escapes in the tests, so what is being tested is visible.
 
 ## Limitations
 
@@ -377,11 +420,16 @@ visible.
   you need the same result on every runtime.
 - **Normalization targets modern Bangla.** Assamese (ৰ ৱ) and Sanskrit-only
   letters pass through, but the Bangla-specific fixes are not tuned for them.
+- **The calendar is the Bangladesh one.** The West Bengal (Indian) Bangla
+  calendar follows the sidereal year and can differ by a day or so; it is not
+  supported. The revised rules are applied to every year, so dates before the
+  1987 and 2019 revisions may not match calendars printed at the time.
 - Number to Bangla words is deliberately out of scope.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately as
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as
 described in [SECURITY.md](SECURITY.md).
 
 ## License

@@ -48,6 +48,7 @@ jobs:
         run: |
           node examples/basic.mjs
           node examples/search.mjs
+          node examples/calendar.mjs 2026-04-14
           node examples/commonjs.cjs
       - name: Check the packed package
         run: npm pack --dry-run

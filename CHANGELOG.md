@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Bangla calendar (বঙ্গাব্দ) module following the revised Bangladesh
+  calendar: `toBanglaDate()` (with month, weekday and season names and the
+  day of the year), `fromBanglaDate()`, `isBanglaLeapYear()` and
+  `banglaMonthLength()`. Dates can be a `Date` (read in a chosen `timeZone`,
+  such as `Asia/Dhaka`), an ISO date string or a `{ year, month, day }`
+  object.
+- `formatBanglaDate()` with `d`, `dd`, `M`, `MM`, `MMMM`, `y`, `EEEE` and `r`
+  (season) pattern tokens, Bangla or ASCII digits, and a `gregorian` mode
+  that writes Gregorian dates with Bangla month names (১৬ ডিসেম্বর ২০২৬).
+- `parseBanglaDate()` for written dates such as `১লা বৈশাখ, ১৪৩৩ বঙ্গাব্দ`,
+  tolerant of common month spelling variants and both nukta forms.
+- Name tables `BANGLA_MONTHS`, `GREGORIAN_MONTHS_BN`, `BANGLA_WEEKDAYS` and
+  `BANGLA_SEASONS`, and the `examples/calendar.mjs` script.
+- `CODE_OF_CONDUCT.md`, issue templates for bug reports and feature requests,
+  and a pull request template.
+
 ## [0.1.0] - 2026-11-12
 
 ### Added
