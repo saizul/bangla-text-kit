@@ -8,6 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Compact numbers with South Asian units: `formatCompact()` writes
+  `১২.৫ লাখ`, `৩.৫ কোটি` or `৪.৫ হাজার` (or `25 lakh` with Latin digits and
+  English units), rounds to `maximumFractionDigits` and moves up a unit when
+  rounding reaches it; `thousand: false` keeps numbers below one lakh whole.
+  `parseCompact()` reads them back, including `১ কোটি ২০ লাখ`, `লক্ষ`,
+  `lac`/`cr`/`k`, a `৳`/`Tk` prefix and a `টাকা` suffix, and returns `NaN`
+  for anything else.
 - Bangla calendar (বঙ্গাব্দ) module following the revised Bangladesh
   calendar: `toBanglaDate()` (with month, weekday and season names and the
   day of the year), `fromBanglaDate()`, `isBanglaLeapYear()` and

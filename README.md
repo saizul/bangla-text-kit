@@ -49,6 +49,9 @@ interchangeably, which makes exact search useless.
   optional, and `findIssues()` reports which problems a text has.
 - **Digits**: ASCII to Bangla and back, `formatNumber()` with lakh/crore
   grouping (১২,৩৪,৫৬৭), and `parseNumber()`.
+- **Compact numbers**: `formatCompact(1250000)` gives ১২.৫ লাখ (হাজার, লাখ,
+  কোটি, or thousand/lakh/crore), and `parseCompact()` reads ১ কোটি ২০ লাখ,
+  `2.5 lakh` or `৳ ৩ হাজার` back into a number.
 - **Search folding**: ি/ী, ু/ূ, শ/ষ/স and ন/ণ by default, with optional
   য/জ, ড়/র, candrabindu and ঋ/রি folds. `findAll()` returns positions in the
   original text for highlighting.
@@ -135,6 +138,31 @@ formatNumber(1234567, { digits: 'latin', grouping: 'international' }); // '1,234
 formatNumber(1500, { fractionDigits: 2 });                              // '১,৫০০.০০'
 parseNumber('১২,৩৪,৫৬৭.৫০');             // 1234567.5
 ```
+
+#### Compact numbers (হাজার, লাখ, কোটি)
+
+```js
+formatCompact(4500);                     // '৪.৫ হাজার'
+formatCompact(1250000);                  // '১২.৫ লাখ'
+formatCompact(35000000);                 // '৩.৫ কোটি'
+formatCompact(12000000000);              // '১,২০০ কোটি'
+formatCompact(99999);                    // '১ লাখ' (rounding moves up a unit)
+formatCompact(2500000, { digits: 'latin', units: 'en' }); // '25 lakh'
+formatCompact(50000, { thousand: false });                // '৫০,০০০'
+formatCompact(1234567, { maximumFractionDigits: 0 });     // '১২ লাখ'
+
+parseCompact('১২.৫ লাখ');                // 1250000
+parseCompact('১ কোটি ২০ লাখ');           // 12000000
+parseCompact('Tk. 2.5 lakh');            // 250000
+parseCompact('৫০ লাখ টাকা');             // 5000000
+parseCompact('অনেক টাকা');               // NaN
+```
+
+`formatCompact()` keeps at most `maximumFractionDigits` (default 2) and drops
+trailing zeros. `parseCompact()` accepts Bangla or ASCII digits, the unit
+words হাজার, লাখ/লক্ষ, কোটি and thousand/k, lakh/lac, crore/cr (any case), a
+leading `৳`/`Tk`/`BDT` and a trailing `টাকা`; several units add up when they
+go from large to small.
 
 Turning numbers into Bangla words (১২৩ to একশো তেইশ) is out of scope for
 this package.
@@ -350,6 +378,7 @@ month names (শ্রাবন, অঘ্রাণ, ফাগুন, both nukta
 | chars | `CP`, `CH`, `isConsonant`, `isFullConsonant`, `isIndependentVowel`, `isVowelSign`, `isPreBaseVowelSign`, `isVariousSign`, `isCombining`, `isBanglaDigit`, `isBanglaLetterOrMark`, `isAssignedBengali`, `inBengaliBlock`, `cps`, `fromCps`, `describeCodePoints` |
 | normalize | `normalize(text, options?)`, `isNormalized`, `findIssues`, `fixKhandaTa`, `cleanJoiners(text, mode?)`, `fixVowelSigns`, `removeDuplicateMarks`, `colonToVisarga`, `visargaToColon`, `pipeToDanda`, `doubleDanda`, `composeNukta`, `decomposeNukta`, `DEFAULT_NORMALIZE_OPTIONS` |
 | digits | `toBanglaDigits(value)`, `toLatinDigits(text)`, `hasBanglaDigits`, `formatNumber(value, options?)`, `parseNumber(text)` |
+| compact | `formatCompact(value, options?)`, `parseCompact(text)` |
 | fold | `fold(text, options?)`, `foldedEquals(a, b, options?)`, `includesFolded`, `createMatcher(query, options?)`, `findAll(text, query, options?)`, `foldWithOffsets`, `DEFAULT_FOLD_OPTIONS` |
 | grapheme | `graphemes(text, options?)`, `graphemeLength`, `sliceGraphemes(text, start, end?, options?)`, `truncate(text, max, options?)`, `reverseGraphemes`, `segmentGraphemesBuiltin(text, conjuncts?)`, `hasIntlSegmenter()` |
 | tokenize | `tokenize(text, options?)`, `words(text, options?)`, `wordCount(text)` |
@@ -394,7 +423,7 @@ npm test        # builds ESM and CJS, compiles the tests, runs node:test
 npm run lint    # biome lint + tsc --noEmit
 ```
 
-The suite has 200 tests covering tricky Unicode cases. Code points are
+The suite has 210 tests covering tricky Unicode cases. Code points are
 checked against the Unicode Bengali chart (U+0980..U+09FF): composition
 exclusions, both nukta forms, legacy khanda ta, joiners next to and away from
 a virama, emoji ZWJ sequences and Persian ZWNJ that must survive, vowel signs
