@@ -4,6 +4,7 @@
 
 export * from './chars.js';
 export * from './normalize.js';
+export * from './compact.js';
 export * from './digits.js';
 export * from './fold.js';
 export * from './grapheme.js';

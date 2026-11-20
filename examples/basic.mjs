@@ -1,6 +1,7 @@
 // Run after `npm run build`:  node examples/basic.mjs
 import {
   banglaRatio,
+  formatCompact,
   formatNumber,
   graphemeLength,
   normalize,
@@ -20,6 +21,12 @@ console.log('normalize      ', normalize(messy));
 
 console.log('digits         ', toBanglaDigits('Order #2026, 3 items'), '|', toLatinDigits('০১৭১২-৩৪৫৬৭৮'));
 console.log('formatNumber   ', formatNumber(12345678.5), '|', formatNumber(12345678.5, { digits: 'latin' }));
+console.log(
+  'formatCompact  ',
+  formatCompact(1250000),
+  '|',
+  formatCompact(35000000, { digits: 'latin', units: 'en' }),
+);
 
 const title = 'স্বাধীনতা দিবসের শুভেচ্ছা';
 console.log(
